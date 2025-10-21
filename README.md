@@ -67,12 +67,31 @@
 ### Cara Menggunakan Aplikasi:
 
 <b>Langkah 1:</b> Input Jumlah Barang. <br>
-Masukkan jumlah barang yang akan dibeli (maksimal 20). Klik "Lanjut ke Input Barang"<br>
+
+- Masukkan jumlah barang yang akan dibeli (maksimal 20).
+- Klik "Lanjut ke Input Barang"
+
 <b>Langkah 2:</b> Input Detail Barang.<br>
-Isi nama barang, harga satuan, dan jumlah untuk setiap barang. Harga total akan dihitung otomatis. Klik "Lanjut ke Konfirmasi"<br>
+
+- Isi nama barang, harga satuan, dan jumlah untuk setiap barang.
+- Harga total akan dihitung otomatis.
+- Klik "Lanjut ke Konfirmasi"
+
 <b>Langkah 3:</b> Konfirmasi Barang.<br>
-Periksa kembali data barang yang telah diinput. Total harga semua barang akan ditampilkan. Klik "Lanjut ke Hitung Diskon"<br>
+
+- Periksa kembali data barang yang telah diinput.
+- Total harga semua barang akan ditampilkan.
+- Klik "Lanjut ke Hitung Diskon"
+
 <b>Langkah 4:</b> Hitung Diskon.<br>
-Pilih tipe pelanggan untuk diskon tambahan. Pilih jenis diskon (persentase atau nominal). Masukkan besar diskon. Klik "Hitung Diskon". Lihat hasil perhitungan dengan total harga, diskon, dan harga akhir<br><br>
+
+- Pilih tipe pelanggan untuk diskon tambahan.
+- Pilih jenis diskon (persentase atau nominal).
+- Masukkan besar diskon.
+- Klik "Hitung Diskon".
+
+- Lihat hasil perhitungan dengan total harga, diskon, dan harga akhir
+
+<br><br>
 
 Aplikasi ini memberikan pengalaman yang lebih lengkap untuk menghitung diskon pada pembelian multiple item dengan interface yang intuitif dan modern.
