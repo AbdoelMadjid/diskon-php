@@ -27,11 +27,11 @@
 
 ### <p align="center">By. **Abdul Madjid, S.Pd., M.Pd.**</p>
 
-<a id="readme-top"></a>
+<br><br>
 
 ### Deskripsi Aplikasi:
 
-1. Multi-Step Form dengan Indikator Langkah
+<b>1. Multi-Step Form dengan Indikator Langkah</b>
 
 - Langkah 1: Input jumlah barang
 - Langkah 2: Input detail barang (nama, harga satuan, jumlah)
@@ -39,25 +39,25 @@
 - Langkah 4: Perhitungan diskon
   Indikator langkah yang menunjukkan progress
 
-2. Input Barang yang Dinamis
+<b>2. Input Barang yang Dinamis</b>
 
 - Form input barang yang disesuaikan dengan jumlah barang yang dimasukkan
 - Auto-kalkulasi harga total per barang (harga satuan × jumlah)
 - Format Rupiah otomatis untuk input harga
 
-3. Tabel Konfirmasi Barang
+<b>3. Tabel Konfirmasi Barang</b>
 
 - Menampilkan semua barang yang telah diinput
 - Menampilkan total harga semua barang
 - Tombol untuk kembali ke langkah sebelumnya atau melanjutkan
 
-4. Perhitungan Diskon untuk Total Pembelian
+<b>4. Perhitungan Diskon untuk Total Pembelian</b>
 
 - Menggunakan total harga semua barang sebagai dasar perhitungan diskon
 - Fitur diskon persentase dan nominal
 - Diskon tambahan berdasarkan tipe pelanggan
 
-5. Fitur Tambahan
+<b>5. Fitur Tambahan</b>
 
 - Tombol reset untuk mengulangi proses
 - Tombol cetak hasil perhitungan
