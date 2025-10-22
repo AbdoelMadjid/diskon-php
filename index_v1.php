@@ -1,10 +1,6 @@
 <?php
+// Aplikasi Kalkulator Diskon dengan Input Barang
 // File: index.php
-// File utama aplikasi
-
-// Include file yang diperlukan
-require_once 'config.php';
-require_once 'functions.php';
 
 // Inisialisasi session
 session_start();
@@ -15,8 +11,7 @@ $diskon_persen = 0;
 $diskon_nominal = 0;
 $total_diskon = 0;
 $harga_akhir = 0;
-$jumlah_bayar = 0;
-$kembalian = 0;
+$hemat = 0;
 $error = '';
 $success = '';
 $jenis_diskon = 'persen';
@@ -24,16 +19,14 @@ $tipe_pelanggan = 'reguler';
 $step = isset($_GET['step']) ? $_GET['step'] : 1;
 $jumlah_barang = isset($_SESSION['jumlah_barang']) ? $_SESSION['jumlah_barang'] : 0;
 
-// Cek apakah perlu menampilkan modal sukses
-$show_cetak_modal = false;
-if (isset($_SESSION['show_success_modal']) && $_SESSION['show_success_modal']) {
-    $show_cetak_modal = true;
-    unset($_SESSION['show_success_modal']);
-}
-
-// Ambil riwayat transaksi
-$riwayat_transaksi = getRiwayatTransaksi($conn);
-
+// Preset diskon berdasarkan tipe pelanggan
+$diskon_presets = [
+    'reguler' => 0,
+    'silver' => 5,
+    'gold' => 10,
+    'platinum' => 15,
+    'vip' => 20
+];
 
 // Proses form jika disubmit
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -91,9 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // Di file index.php, cari bagian ini:
-
-    // Step 4: Hitung diskon dan simpan ke database
+    // Step 4: Hitung diskon
     if (isset($_POST['submit_diskon'])) {
         $harga_total = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_harga_semua'] : 0;
         $jenis_diskon = isset($_POST['jenis_diskon']) ? $_POST['jenis_diskon'] : 'persen';
@@ -132,115 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
-            // Hitung harga akhir
+            // Hitung harga akhir dan hemat
             $harga_akhir = $harga_total - $total_diskon;
+            $hemat = $total_diskon;
 
-            // TAMBAHKAN VALIDASI DI SINI
-            if ($harga_akhir <= 0) {
-                $error = 'Harga akhir tidak valid! Silakan periksa kembali perhitungan diskon.';
-            } else {
-                // Simpan nilai ke session untuk digunakan di langkah berikutnya
-                $_SESSION['harga_akhir'] = $harga_akhir;
-                $_SESSION['total_diskon'] = $total_diskon;
-                $_SESSION['diskon_persen'] = $diskon_persen;
-                $_SESSION['diskon_nominal'] = $diskon_nominal;
-                $_SESSION['jenis_diskon'] = $jenis_diskon;
-                $_SESSION['tipe_pelanggan'] = $tipe_pelanggan;
-
-                // Format untuk display
-                $harga_total_display = formatRupiah($harga_total);
-                $harga_akhir_display = formatRupiah($harga_akhir);
-                $total_diskon_display = formatRupiah($total_diskon);
-            }
-        }
-    }
-
-    // Step 5: Proses pembayaran
-    if (isset($_POST['submit_pembayaran'])) {
-        $harga_total = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_harga_semua'] : 0;
-        $jenis_diskon = isset($_POST['jenis_diskon']) ? $_POST['jenis_diskon'] : 'persen';
-        $tipe_pelanggan = isset($_POST['tipe_pelanggan']) ? $_POST['tipe_pelanggan'] : 'reguler';
-        $harga_akhir = isset($_POST['harga_akhir_hidden']) ? floatval($_POST['harga_akhir_hidden']) : 0;
-        $jumlah_bayar = isset($_POST['jumlah_bayar']) ? floatval(str_replace('.', '', $_POST['jumlah_bayar'])) : 0;
-
-        // Hitung kembalian
-        $kembalian = $jumlah_bayar - $harga_akhir;
-
-        if ($jumlah_bayar < $harga_akhir) {
-            $error = 'Jumlah bayar kurang dari total pembayaran!';
-        } else {
-            // Hitung diskon berdasarkan jenis
-            if ($jenis_diskon == 'persen') {
-                $diskon_persen = isset($_POST['diskon_persen']) ? floatval($_POST['diskon_persen']) : 0;
-                $diskon_nominal = 0;
-
-                // Tambah diskon member
-                $diskon_member = $diskon_presets[$tipe_pelanggan];
-                $total_diskon_persen = $diskon_persen + $diskon_member;
-
-                // Batasi maksimal diskon 100%
-                if ($total_diskon_persen > 100) {
-                    $total_diskon_persen = 100;
-                    $success = 'Diskon melebihi 100%, otomatis diset ke 100%';
-                }
-
-                $total_diskon = ($harga_total * $total_diskon_persen) / 100;
-            } else {
-                $diskon_persen = 0;
-                $diskon_nominal = isset($_POST['diskon_nominal']) ? floatval(str_replace('.', '', $_POST['diskon_nominal'])) : 0;
-
-                // Tambah diskon member
-                $diskon_member = ($harga_total * $diskon_presets[$tipe_pelanggan]) / 100;
-                $total_diskon = $diskon_nominal + $diskon_member;
-
-                // Batasi diskon tidak melebihi harga
-                if ($total_diskon > $harga_total) {
-                    $total_diskon = $harga_total;
-                    $success = 'Total diskon melebihi harga barang, otomatis disesuaikan';
-                }
-            }
-
-            // Siapkan data untuk disimpan
-            $data_transaksi = array(
-                'kode_transaksi' => generateKodeTransaksi(),
-                'tanggal' => date('Y-m-d H:i:s'),
-                'total_harga' => $harga_total,
-                'jenis_diskon' => $jenis_diskon,
-                'diskon_persen' => $diskon_persen,
-                'diskon_nominal' => $diskon_nominal,
-                'diskon_member' => $diskon_presets[$tipe_pelanggan],
-                'total_diskon' => $total_diskon,
-                'harga_akhir' => $harga_akhir,
-                'jumlah_bayar' => $jumlah_bayar,
-                'kembalian' => $kembalian,
-                'tipe_pelanggan' => $tipe_pelanggan,
-                'barang' => $_SESSION['barang']
-            );
-
-            // Simpan ke database
-            $result = simpanTransaksi($conn, $data_transaksi);
-
-            if ($result['success']) {
-                // Reset session untuk transaksi baru
-                unset($_SESSION['jumlah_barang']);
-                unset($_SESSION['barang']);
-                unset($_SESSION['total_harga_semua']);
-                unset($_SESSION['harga_akhir']);
-                unset($_SESSION['total_diskon']);
-                unset($_SESSION['diskon_persen']);
-                unset($_SESSION['diskon_nominal']);
-                unset($_SESSION['jenis_diskon']);
-                unset($_SESSION['tipe_pelanggan']);
-
-                // Set flag untuk menampilkan modal notifikasi
-                $_SESSION['show_success_modal'] = true;
-
-                // Redirect ke halaman awal
-                header('Location: index.php');
-                exit;
-            } else {
-                $error = "Error: " . $result['error'];
-            }
+            // Format untuk display
+            $harga_total_display = number_format($harga_total, 0, ',', '.');
+            $harga_akhir_display = number_format($harga_akhir, 0, ',', '.');
+            $hemat_display = number_format($hemat, 0, ',', '.');
+            $total_diskon_display = number_format($total_diskon, 0, ',', '.');
         }
     }
 
@@ -263,17 +154,232 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Kalkulator Diskon dengan Database</title>
+    <title>Aplikasi Kalkulator Diskon dengan Input Barang</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="style.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .main-container {
+            padding: 50px 0;
+        }
+
+        .card {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .card-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .card-header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            padding: 12px 15px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-outline-secondary {
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .result-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .price-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .discount-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 5px;
+        }
+
+        .member-badge {
+            background: #ffd700;
+            color: #333;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+
+        .input-group-text {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px 0 0 10px;
+        }
+
+        .form-control.rounded-end {
+            border-radius: 0 10px 10px 0;
+        }
+
+        .icon-box {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .icon-box i {
+            font-size: 4rem;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 10px;
+            position: relative;
+        }
+
+        .step.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .step.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .step:not(:last-child):after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            width: 20px;
+            height: 2px;
+            background: #e0e0e0;
+            transform: translateY(-50%);
+        }
+
+        .step.completed:not(:last-child):after {
+            background: #28a745;
+        }
+
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .barang-row {
+            transition: all 0.3s;
+        }
+
+        .barang-row:hover {
+            background-color: #f8f9fa;
+        }
+
+        .step-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #667eea;
+        }
+
+        .step-title h2 {
+            font-weight: 700;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container main-container">
-        <div class="row">
-            <div class="col-lg-12">
-                <div class="card mb-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card">
                     <div class="card-header">
                         <h1><i class="fas fa-calculator"></i> Kalkulator Diskon</h1>
                         <p>Hitung harga setelah diskon dengan mudah dan cepat</p>
@@ -290,7 +396,6 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                             <div class="step <?php echo $step >= 2 ? ($step > 2 ? 'completed' : 'active') : ''; ?>">2</div>
                             <div class="step <?php echo $step >= 3 ? ($step > 3 ? 'completed' : 'active') : ''; ?>">3</div>
                             <div class="step <?php echo $step >= 4 ? ($step > 4 ? 'completed' : 'active') : ''; ?>">4</div>
-                            <div class="step <?php echo $step >= 5 ? ($step > 5 ? 'completed' : 'active') : ''; ?>">5</div>
                         </div>
 
                         <?php if ($error): ?>
@@ -301,8 +406,8 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                         <?php endif; ?>
 
                         <?php if ($success): ?>
-                            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                                <i class="fas fa-check-circle"></i> <?php echo $success; ?>
+                            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                                <i class="fas fa-info-circle"></i> <?php echo $success; ?>
                                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         <?php endif; ?>
@@ -417,14 +522,14 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                                             <tr>
                                                 <td><?php echo $no++; ?></td>
                                                 <td><?php echo htmlspecialchars($barang['nama']); ?></td>
-                                                <td><?php echo formatRupiah($barang['harga_satuan']); ?></td>
+                                                <td><?php echo number_format($barang['harga_satuan'], 0, ',', '.'); ?></td>
                                                 <td><?php echo $barang['jumlah']; ?></td>
-                                                <td><?php echo formatRupiah($barang['harga_total']); ?></td>
+                                                <td><?php echo number_format($barang['harga_total'], 0, ',', '.'); ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         <tr>
                                             <td colspan="4" class="text-end fw-bold">Total Harga Semua Barang:</td>
-                                            <td class="fw-bold">Rp <?php echo formatRupiah($total_harga_semua); ?></td>
+                                            <td class="fw-bold">Rp <?php echo number_format($total_harga_semua, 0, ',', '.'); ?></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -463,7 +568,7 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                                         <div class="input-group">
                                             <span class="input-group-text">Rp</span>
                                             <input type="text" class="form-control rounded-end"
-                                                value="<?php echo formatRupiah($total_harga_semua); ?>" readonly>
+                                                value="<?php echo number_format($total_harga_semua, 0, ',', '.'); ?>" readonly>
                                         </div>
                                     </div>
 
@@ -533,7 +638,7 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                                                 <span class="input-group-text">Rp</span>
                                                 <input type="text" class="form-control rounded-end" id="diskon_nominal"
                                                     name="diskon_nominal" placeholder="0"
-                                                    value="<?php echo isset($_POST['diskon_nominal']) ? formatRupiah(floatval(str_replace('.', '', $_POST['diskon_nominal']))) : ''; ?>"
+                                                    value="<?php echo isset($_POST['diskon_nominal']) ? number_format(floatval(str_replace('.', '', $_POST['diskon_nominal'])), 0, ',', '.') : ''; ?>"
                                                     onkeyup="formatRupiah(this)">
                                             </div>
                                         </div>
@@ -559,7 +664,7 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                             <?php if ($harga_akhir > 0): ?>
                                 <div class="result-box show">
                                     <div class="text-center">
-                                        <h3><i class="fas fa-check-circle"></i> Hasil Perhitungan Diskon</h3>
+                                        <h3><i class="fas fa-check-circle"></i> Hasil Perhitungan</h3>
 
                                         <div class="row mt-4">
                                             <div class="col-md-4">
@@ -586,7 +691,7 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
 
                                         <div class="mt-4">
                                             <span class="member-badge">
-                                                <i class="fas fa-crown"></i> Anda Hemat: Rp <?php echo $total_diskon_display; ?>
+                                                <i class="fas fa-crown"></i> Anda Hemat: Rp <?php echo $hemat_display; ?>
                                             </span>
                                         </div>
 
@@ -602,175 +707,8 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                                         <?php endif; ?>
 
                                         <div class="mt-4">
-                                            <button type="button" class="btn btn-light me-2" onclick="window.location.href='index.php?step=5'">
-                                                <i class="fas fa-money-bill-wave"></i> Lanjut ke Pembayaran
-                                            </button>
-                                            <button type="button" class="btn btn-light" onclick="window.location.href='index.php'">
-                                                <i class="fas fa-plus"></i> Transaksi Baru
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
-                        <?php endif; ?>
-
-                        <!-- Step 5: Pembayaran -->
-                        <?php if ($step == 5): ?>
-                            <?php
-                            // Ambil nilai dari session jika ada
-                            if (!isset($harga_akhir) || $harga_akhir == 0) {
-                                $harga_akhir = isset($_SESSION['harga_akhir']) ? $_SESSION['harga_akhir'] : 0;
-                                $total_diskon = isset($_SESSION['total_diskon']) ? $_SESSION['total_diskon'] : 0;
-                                $diskon_persen = isset($_SESSION['diskon_persen']) ? $_SESSION['diskon_persen'] : 0;
-                                $diskon_nominal = isset($_SESSION['diskon_nominal']) ? $_SESSION['diskon_nominal'] : 0;
-                                $jenis_diskon = isset($_SESSION['jenis_diskon']) ? $_SESSION['jenis_diskon'] : 'persen';
-                                $tipe_pelanggan = isset($_SESSION['tipe_pelanggan']) ? $_SESSION['tipe_pelanggan'] : 'reguler';
-                                $harga_total = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_harga_semua'] : 0;
-
-                                // Format untuk display
-                                $harga_total_display = formatRupiah($harga_total);
-                                $harga_akhir_display = formatRupiah($harga_akhir);
-                                $total_diskon_display = formatRupiah($total_diskon);
-                            }
-                            ?>
-
-                            <div class="step-title">
-                                <h2><i class="fas fa-money-check-alt"></i> Langkah 5: Pembayaran</h2>
-                                <p>Masukkan jumlah pembayaran dan hitung kembalian</p>
-                            </div>
-
-                            <form method="POST" action="">
-                                <input type="hidden" id="harga_akhir_hidden" name="harga_akhir_hidden" value="<?php echo $harga_akhir; ?>">
-                                <input type="hidden" name="jenis_diskon" value="<?php echo $jenis_diskon; ?>">
-                                <input type="hidden" name="tipe_pelanggan" value="<?php echo $tipe_pelanggan; ?>">
-                                <input type="hidden" name="diskon_persen" value="<?php echo $diskon_persen; ?>">
-                                <input type="hidden" name="diskon_nominal" value="<?php echo $diskon_nominal; ?>">
-
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold">
-                                            <i class="fas fa-shopping-cart"></i> Total Harga
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Rp</span>
-                                            <input type="text" class="form-control rounded-end"
-                                                value="<?php echo $harga_total_display; ?>" readonly>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold">
-                                            <i class="fas fa-piggy-bank"></i> Total Diskon
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Rp</span>
-                                            <input type="text" class="form-control rounded-end"
-                                                value="<?php echo $total_diskon_display; ?>" readonly>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold">
-                                            <i class="fas fa-money-bill-wave"></i> Harga Akhir
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Rp</span>
-                                            <input type="text" class="form-control rounded-end"
-                                                value="<?php echo $harga_akhir_display; ?>" readonly>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <label for="jumlah_bayar" class="form-label fw-bold">
-                                            <i class="fas fa-money-check"></i> Jumlah Bayar
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Rp</span>
-                                            <input type="text" class="form-control rounded-end" id="jumlah_bayar"
-                                                name="jumlah_bayar" placeholder="0"
-                                                onkeyup="formatRupiah(this); hitungKembalian()" required>
-                                        </div>
-                                        <div id="errorBayar" class="invalid-feedback d-none">
-                                            Jumlah bayar kurang dari total pembayaran!
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold">
-                                            <i class="fas fa-hand-holding-usd"></i> Kembalian
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Rp</span>
-                                            <input type="text" class="form-control rounded-end" id="kembalian"
-                                                value="0" readonly>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-6 d-flex align-items-end">
-                                        <button type="submit" name="submit_pembayaran" id="submitSimpan" class="btn btn-primary w-100" disabled>
-                                            <i class="fas fa-save"></i> Simpan Transaksi
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex justify-content-between">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='index.php?step=4'">
-                                        <i class="fas fa-arrow-left"></i> Kembali
-                                    </button>
-                                    <button type="submit" name="reset" class="btn btn-outline-secondary">
-                                        <i class="fas fa-redo"></i> Reset Semua
-                                    </button>
-                                </div>
-                            </form>
-
-                            <?php if ($kembalian >= 0 && $jumlah_bayar > 0): ?>
-                                <div class="result-box show">
-                                    <div class="text-center">
-                                        <h3><i class="fas fa-check-circle"></i> Transaksi Berhasil</h3>
-
-                                        <div class="row mt-4">
-                                            <div class="col-md-3">
-                                                <div class="discount-badge">
-                                                    <i class="fas fa-tag"></i> Total Harga
-                                                </div>
-                                                <div class="price-display">Rp <?php echo $harga_total_display; ?></div>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <div class="discount-badge">
-                                                    <i class="fas fa-piggy-bank"></i> Total Diskon
-                                                </div>
-                                                <div class="price-display">Rp <?php echo $total_diskon_display; ?></div>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <div class="discount-badge">
-                                                    <i class="fas fa-money-bill-wave"></i> Jumlah Bayar
-                                                </div>
-                                                <div class="price-display">Rp <?php echo $jumlah_bayar_display; ?></div>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <div class="discount-badge">
-                                                    <i class="fas fa-hand-holding-usd"></i> Kembalian
-                                                </div>
-                                                <div class="price-display">Rp <?php echo $kembalian_display; ?></div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-4">
-                                            <span class="member-badge">
-                                                <i class="fas fa-crown"></i> Anda Hemat: Rp <?php echo $total_diskon_display; ?>
-                                            </span>
-                                        </div>
-
-                                        <div class="mt-4">
-                                            <button type="button" class="btn btn-light me-2" onclick="window.location.href='index.php'">
-                                                <i class="fas fa-plus"></i> Transaksi Baru
+                                            <button type="button" class="btn btn-light" onclick="window.print()">
+                                                <i class="fas fa-print"></i> Cetak Hasil
                                             </button>
                                         </div>
                                     </div>
@@ -780,135 +718,64 @@ $total_harga_semua = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_ha
                     </div>
                 </div>
             </div>
-
-            <!-- Sidebar Riwayat Transaksi -->
-            <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4><i class="fas fa-history"></i> Riwayat Transaksi</h4>
-                    </div>
-                    <div class="card-body p-2">
-                        <?php if (empty($riwayat_transaksi)): ?>
-                            <div class="text-center text-muted py-4">
-                                <i class="fas fa-inbox fa-3x mb-3"></i>
-                                <p>Belum ada transaksi</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-riwayat table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tanggal</th>
-                                            <th>Total</th>
-                                            <th>Diskon</th>
-                                            <th>Bayar</th>
-                                            <th>Kembali</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($riwayat_transaksi as $transaksi): ?>
-                                            <tr>
-                                                <td>
-                                                    <div class="kode-transaksi"><?php echo $transaksi['kode_transaksi']; ?></div>
-                                                </td>
-                                                <td>
-                                                    <small><?php echo date('d/m', strtotime($transaksi['tanggal'])); ?></small><br>
-                                                    <small class="text-muted"><?php echo date('H:i', strtotime($transaksi['tanggal'])); ?></small>
-                                                </td>
-                                                <td>Rp <?php echo formatRupiah($transaksi['total_harga']); ?></td>
-                                                <td>Rp <?php echo formatRupiah($transaksi['total_diskon']); ?></td>
-                                                <td>Rp <?php echo formatRupiah($transaksi['jumlah_bayar']); ?></td>
-                                                <td>Rp <?php echo formatRupiah($transaksi['kembalian']); ?></td>
-                                                <td>
-                                                    <button type="button" class="btn btn-outline-primary btn-action btn-sm"
-                                                        onclick="showDetail(<?php echo $transaksi['id']; ?>)"
-                                                        title="Lihat Detail">
-                                                        <i class="fas fa-eye"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-outline-success btn-action btn-sm"
-                                                        onclick="cetakStruk(<?php echo $transaksi['id']; ?>)"
-                                                        title="Cetak Struk">
-                                                        <i class="fas fa-print"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-outline-danger btn-action btn-sm"
-                                                        onclick="hapusTransaksi(<?php echo $transaksi['id']; ?>, '<?php echo $transaksi['kode_transaksi']; ?>')"
-                                                        title="Hapus Transaksi">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
-
-    <!-- Modal Detail Transaksi -->
-    <div class="modal fade" id="detailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Detail Transaksi</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="modalContent">
-                    <!-- Content akan diisi via AJAX -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Container untuk Toast Notifications -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
-
-    <!-- Modal Cetak Struk Otomatis -->
-    <?php if ($show_cetak_modal): ?>
-        <div class="modal fade" id="cetakModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title">
-                            <i class="fas fa-check-circle"></i> Transaksi Berhasil
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <div class="mb-3">
-                            <i class="fas fa-receipt fa-4x text-success"></i>
-                        </div>
-                        <h4>Transaksi berhasil disimpan!</h4>
-                        <p class="text-info mt-2">Anda dapat mencetak struk melalui riwayat transaksi</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
-                            <i class="fas fa-check"></i> OK
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="script.js"></script>
+    <script>
+        // Format input ke Rupiah
+        function formatRupiah(input) {
+            let value = input.value.replace(/[^\d]/g, '');
+            let formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            input.value = formatted;
+        }
 
-    <!-- Script untuk menampilkan modal cetak otomatis -->
-    <?php if ($show_cetak_modal && isset($transaksi)): ?>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const cetakModal = new bootstrap.Modal(document.getElementById('cetakModal'));
-                cetakModal.show();
+        // Toggle antara diskon persen dan nominal
+        function toggleDiskonType() {
+            const persenRadio = document.getElementById('persen');
+            const nominalRadio = document.getElementById('nominal');
+            const persenField = document.getElementById('diskonPersenField');
+            const nominalField = document.getElementById('diskonNominalField');
+
+            if (persenRadio.checked) {
+                persenField.style.display = 'block';
+                nominalField.style.display = 'none';
+            } else {
+                persenField.style.display = 'none';
+                nominalField.style.display = 'block';
+            }
+        }
+
+        // Hitung total harga per barang
+        function calculateTotal(index) {
+            const hargaInput = document.querySelector(`input[name="harga_satuan_${index}"]`);
+            const jumlahInput = document.querySelector(`input[name="jumlah_${index}"]`);
+            const totalInput = document.querySelector(`input[name="total_${index}"]`);
+
+            const harga = parseFloat(hargaInput.value.replace(/[^\d]/g, '')) || 0;
+            const jumlah = parseInt(jumlahInput.value) || 0;
+            const total = harga * jumlah;
+
+            totalInput.value = total.toLocaleString('id-ID');
+        }
+
+        // Inisialisasi tampilan saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleDiskonType();
+
+            // Format semua input harga saat halaman dimuat
+            document.querySelectorAll('.harga-input').forEach(input => {
+                formatRupiah(input);
             });
-        </script>
-    <?php endif; ?>
+
+            // Hitung total untuk semua barang
+            <?php if ($step == 2): ?>
+                <?php for ($i = 1; $i <= $jumlah_barang; $i++): ?>
+                    calculateTotal(<?php echo $i; ?>);
+                <?php endfor; ?>
+            <?php endif; ?>
+        });
+    </script>
 </body>
 
 </html>
