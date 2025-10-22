@@ -91,8 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // Di file index.php, cari bagian ini:
-
     // Step 4: Hitung diskon dan simpan ke database
     if (isset($_POST['submit_diskon'])) {
         $harga_total = isset($_SESSION['total_harga_semua']) ? $_SESSION['total_harga_semua'] : 0;
